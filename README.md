@@ -1,26 +1,26 @@
 
 # VMBusify(vmbusify) solution and specification
 
-## Lead
+## 1 Lead
 
 VMBusify(vmbusify), provide a way for communication and control between physical and virtual machines based on Microsoft VMBus architecture, this name combines 'VMBus' and 'simplify', and suggests that the software simplifies communication and control between the physical and virtual machines.
 
-## Requirements
+## 2 Requirements
 
 we have two cases:
 
-1. after virtual machine created, usually, the SDN network is not ready immediately and the virtual machine is not accessible, in such a period before SDN network ready, we need an alternative way to set up the communications between the virtual machines and external network, then we can directly install softwares and perform initialization tasks on the virutal machine without SDN networking, shorten the virtual machine preparation time.
+- after virtual machine created, usually, the SDN network is not ready immediately and the virtual machine is not accessible, in such a period before SDN network ready, we need an alternative way to set up the communications between the virtual machines and external network, then we can directly install softwares and perform initialization tasks on the virutal machine without SDN networking, shorten the virtual machine preparation time.
 
-2. when the SDN network encouters some failures, there would be no route from the virtual machines to access external network and also they are unreachable from external network, in such case, we need an alternative way to recover the communications between the virtual machines and external network, to repair the network fault, making the services on virtual machines available for winning a highly continuity, shorten the downtime.
+- when the SDN network encouters some failures, there would be no route from the virtual machines to access external network and also they are unreachable from external network, in such case, we need an alternative way to recover the communications between the virtual machines and external network, to repair the network fault, making the services on virtual machines available for winning a highly continuity, shorten the downtime.
 
 in summary, an alternative way is very necessary for operations, commnunications and controls to virtual machines when SDN network is unavalable, based on Microsoft Hyper-V architecture, VMBus provide us such an alternative way and this project is based on this technology.
 
-## Approaches
+## 3 Approaches
 
 for commnucation and control between physical and virtual machines based on VMBus technology, we provide the following three approaches.
 
 
-### 1. command-execution
+### 3.1 command-execution
 
 command line tool running on physical machine, similar with the PSExec tool, use it to connect to a target virtual machine and execute commands with stdin and stdout being redirected to the physical machine
 
@@ -28,15 +28,15 @@ typical usage:
 
 		vmbusifyexec <VMID> [-it] <program> <args>
 
-### 2. socks-proxy
+### 3.2 socks-proxy
 
 a bidirectional socks proxy via vmbus as a underlay tunnel between the physical machine and virtual machines that it holds,	processes on the virtual machine can use this proxy to access the external network by the physical machine as the socks proxy server,	processes on the physical machine also can use this proxy to access the tcp services on the virtual machines
 
-### 3. virtual-subnet
+### 3.3 virtual-subnet
 
 networkng for the virtual machines and physical machine, a virutal subnet can be built among the physical machine and all virutal machines that it holds, with the physical machine as the NAT for this subnet connecting to external network, being different from normal network, this virutal subnet use vmbus as the physical layer instead of Ethernet and MAC
 
-## Architecture
+## 4 Architecture
 
 in summary, below is the architecture overview illustration
 
@@ -96,7 +96,7 @@ in summary, below is the architecture overview illustration
 
 ```
 
-### vmbus-tunnel
+### 4.1 vmbus-tunnel
 
 this is the transport layer based on VMBus between physical and virtual machines, for each virtual machine, physical machine could establish one VMBus connection with it and provide TLV (Type-Length-Value) format package switch capability by time division multiplexing. we define the TLV format data transfer unit as vmbus package.
 
@@ -183,7 +183,7 @@ application message route table two-tuple, the second element of the tuple is a 
 
 message-id indicates what message they want and message-source-entity-name indicates from which entity they care, if and only if the given message from the given source entity would be targeted to the declared message handler. for each mesage, if there exists more than one handler, then each handler would be triggered serially in order of registration.
 
-### command-execution approach
+### 4.2 command-execution approach
 
 to to sum up the command exectuion machanism, the vmbusifyexec, command listener, vmbus-tunnel and command executor get together to constitute an application for remote commands execution, such as the Windows internal tool 'PsExec'.
 
@@ -249,28 +249,28 @@ to to sum up the command exectuion machanism, the vmbusifyexec, command listener
 
 ```
 
-#### vmbusifyexec
+#### 4.2.1 vmbusifyexec
 
 this entity is a command line tool for executing command on virutal machines via the physical machine. it only deploys on pysical machine endpoint. usage of this tool is similar to 'PsExec'.
 
-#### command-listener
+#### 4.2.2 command-listener
 
 this entity only deploys on physcial machine endpoint, listen on tcp 127.0.0.1:6543, providing an operation interface for command line tools such as vmbusifyctl and vmbusifyexec. we defined two types of commands, the first class is built-in commands for controlling the vmbus-tunnel, for example, connect to or disconnect from given target virutal machine, the second class is application specified commands, for example, execute ping command on given target virtual machine. actually, the command listener works based on a http server, command tools use http protocol to communicate with it.
 
-#### command-executor
+#### 4.2.3 command-executor
 
 this entity only deploys on virutal machine endpoint, it receives command execution messages from vmbus-tunnel initiated by vmbusifyexec tool via command listener, then it will create process to run required program, redirect stdin and stdout if required, print on stdout could be returned to vmbusifyexec ontime. set timeout for executing process is supported and after process terminated, exit code will be returned to vmbusifyexec.
 
-### socks-proxy approach
+### 4.3 socks-proxy approach
 
-#### proxy-client
+#### 4.3.1 proxy-client
 
-#### proxy-server
+#### 4.3.2 proxy-server
 
-### virutal-subnet approach
+### 4.4 virutal-subnet approach
 
-#### ip-bearer
+#### 4.4.1 ip-bearer
 
-#### vir-ethio
+#### 4.4.2 vir-ethio
 
-#### nat
+#### 4.4.3 nat
