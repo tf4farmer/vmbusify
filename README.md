@@ -102,25 +102,25 @@ this is the transport layer based on VMBus between physical and virtual machines
 
 so, for the virtual machine endpoint, it will listen on VMBus and then accept the VMBus connection, only one connection would be kept, new connection would be accepted unless current connection being released.
 
-for the physical machine, it will connect to a virtual machine on demand, also, user could make the physical machine connect to all virtual machines that it holds and keep the connections available for the full life cycle. typically, physical machine endpoint will keep a set indicating relationship from VMID(virtual machine identity) to the socket of VMBus connection.
+for the physical machine, it will connect to a virtual machine on demand, also, user could make the physical machine connect to all virtual machines that it holds and keep the connections available for the full life cycle. typically, physical machine endpoint will keep a set indicating relationship from VMID(virtual machine identity) and IP address to the socket of VMBus connection.
 
-virtual machine connection relationship two-tuple:
+virtual machine connection relationship triple-tuple:
 
-		{<VMID, socket>}
+		{<vmid, ip, socket>}
 
-as the following illustration, physical machine manages multiple connections and only one connection for each virtual machine, for the vmbus-tunnel, we only support sending and receiving messages between the virtual machine and physical machine, dispatching message from one virtual machine to another virtual machine via physical machine by vmbus-tunnel is not support.
+on physical machine endpoint, VMID is provide for upper layer to distinguish the target virutal machine to vmbus-tunnel that it would like to send message to, and vmbus-tunnel provide a service for upper layer to get VMID by virtual machine IP address. as the following illustration, physical machine manages multiple connections and only one connection for each virtual machine, for the vmbus-tunnel, we only support sending and receiving messages between the virtual machine and physical machine, dispatching message from one virtual machine to another virtual machine via physical machine by vmbus-tunnel is not support.
 
 
 ```
 +-----------------+
-|                 |                              <vmid1, sock1>
+|                 |                              <vmid1, ip1, sock1>
 | virtual machine <--------------------------------+
 |                 |                                |
 +-----------------+                                |
                                                    |
                                                    |
 +-----------------+                                |
-|                 |            <vmid3,sock3>       |
+|                 |           <vmid3, ip3, sock3>  |
 | virtual machine <---------------+                |
 |                 |               |                |
 +-----------------+               |            +---+--------------+
@@ -129,14 +129,14 @@ as the following illustration, physical machine manages multiple connections and
 +-----------------+               +------------+                  |
 |                 |               |            +---+--------------+
 | virtual machine <---------------+                |
-|                 |           <vmid4, sock4>       |
+|                 |          <vmid4, ip4, sock4>   |
 +-----------------+                                |
                                                    |
                                                    |
 +-----------------+                                |
 |                 |                                |
 | virtual machine <--------------------------------+
-|                 |                              <vmid2, sock2>
+|                 |                              <vmid2, ip2, sock2>
 +-----------------+
 
 ```
@@ -182,6 +182,26 @@ application message route table two-tuple, the second element of the tuple is a 
 		{<self-entity-name, {<message-source-entity-name, message-id, message-handler>}>}
 
 message-id indicates what message they want and message-source-entity-name indicates from which entity they care, if and only if the given message from the given source entity would be targeted to the declared message handler. for each message, if there exists more than one handler, then each handler would be triggered serially in order of registration.
+
+
+for sending and receiving data, on virtual machine endpoint, vmbus tunnel provide the following interfaces:
+
+```
+	int sync_send(int message_id, char const * data, int size, char ** out_buf_ptr, int * bytes_returned);
+	int async_send(int message_id, char const * data, int size);
+	typedef int (*message_handler)(int message_id, char const * data, int size, char ** out_buf_ptr, int * bytes_returned);
+```
+
+for sending and receiving data, on physical machine endpoint, vmbus-tunnel provide the following interfaces:
+
+```
+	int sync_send(string const &vmid, int message_id, char const * data, int size, char ** out_buf_ptr, int * bytes_returned);
+	int async_send(string const &vmid, int message_id, char const * data, int size);
+	typedef int (*message_handler)(string const &vmid, int message_id, char const * data, int size, char ** out_buf_ptr, int * bytes_returned);
+	string get_vmid_by_ip(char const * ip);
+```
+
+the intefaces quoted above are only a conceptual design, the sync_send and async_send are used for sending data to remote endpoint, message_handler is used for receiving message from remote endpoint. the difference bewteen physical and virtual machine is the vmid parameter is required by physical machine endpoint, because physical machine manages multiple vmbus connections and for sending message, it must provide the vmid of target virtual machine, for receiving message, it also will be informed the vmid indicating the message from which virutal machine sent. for the virtual machine endpoint, thanks to the restriction of only one connection with physical machine, target for sending and source for receiving is not needed.
 
 ### 4.2 command-execution approach
 
@@ -263,9 +283,127 @@ this entity only deploys on virtual machine endpoint, it receives command execut
 
 ### 4.3 socks-proxy approach
 
+we provide a bidirectional socks proxy mechanism for user based on socksv5 protocol. for the virtual machine endpoint, user could use this approach to access external network by physical machine and for the physical machine, user could use this approach to access tcp service on the virtual machine. the following illustration is the typical routine for virtual machine to establish http connection with external http service by the socks proxy mechanism through vmbus tunnel.
+
+for a common socks proxy server, it is a single process that listening on a tcp port for accepting socks proxy requests and generate a socket with user, then it will receive the real target ip and port by socks protocol via the socke with user, after that, it will connect to the real target ip and port and then generate a socket with target, then it has the relationship of the socket-with-user and socket-with-target, for data received from socket-with-user, then send to socket-with-target and for data received from socket-with-target, then send to socket-with-user. being different from such a common socks proxy server routine, in our vmbus context, the socks proxy server is divided into two parts, in other words two processes, proxy client that deploys on local endpoint and proxy server that deploys on remote endpoint. for the proxy client, it listens on a local tcp port and receives socks proxy request from user, for the proxy server, it is responsible for connecting to real target, so, the proxy client keeps the socket-with-user and the proxy server keeps the socket-with-target, and the bidirectional data is carried by the vmbus tunnel. the mapping relationship for the socket-with-user and socket-with-target is being accomplished by a proxy-id generated by proxy client for each socket-with-user.
+
+generally, we defines the following proxy messages:
+
+		PROXY-OPEN
+			from proxy client to proxy server, indicating the target ip and port
+		PROXY-OPEN-ACK:
+			from proxy server to proxy client, acknowledgement of PROXY-OPEN, indicating whether the target connection established or not
+		PROXY-DATA:
+			bidirectional, for transmitting data, with proxy-id as the bridge between the socket-with-user and socket-with-target.
+		PROXY-CLOSE:
+			bidirectional, for disconnecting tcp connection and closing socket. when user shutdown and close socket, the socket-wit-user will be closed by proxy client, then this message will be send to proxy server on remote endpoint with the related proxy-id, to inform the proxy server shutdown and close the socket-with-target, meanwhile, when the socket-with-target disconnected, socket-wit-user also will be closed by proxy client after receiving PROXY-CLOSE message from proxy server.
+
+
+```
+                            virtual machine                                                        physical machine
++------------------------------------------------------------------------+          +-------------------------------------------+
++                                                                        +          +                                           +
+
++----------------+          +----------------+          +----------------+          +----------------+         +----------------+         +----------------+
+|                |          |                |          |                |          |                |         |                |         |                |
+|  wget b.com    |          |  proxy client  |          |  vmbus-tunnel  |          |  vmbus-tunnel  |         |  proxy server  |         |     b.com      |
+|                |          |                |          |                |          |                |         |                |         |                |
++-------+--------+          +-------+--------+          +-------+--------+          +--------+-------+         +--------+-------+         +-------+--------+
+        |                           |                           |                            |                          |                         |
+        |        tcp connect        |                           |                            |                          |                         |
+        +--------------------------->                           |                            |                          |                         |
+        |                           |                           |                            |                          |                         |
+        |                           +-----+                     |                            |                          |                         |
+        |                           |     |sock=accept()        |                            |                          |                         |
+        |                           |     |generate proxyid     |                            |                          |                         |
+        |                           <-----+                     |                            |                          |                         |
+        |       connect ack         |                           |                            |                          |                         |
+        <---------------------------+                           |                            |                          |                         |
+        |                           |                           |                            |                          |                         |
+        |                           |                           |                            |                          |                         |
+        |                           |                           |                            |                          |                         |
+        |     scoskv5 handshake     |                           |                            |                          |                         |
+        +--------------------------->                           |                            |                          |                         |
+        |        ip,port            |                           |                            |                          |                         |
+        |                           |            call           |                            |                          |                         |
+        |                           +--------------------------->                            |                          |                         |
+        |                           |     proxy-open message    |                            |                          |                         |
+        |                           |      proxyid,ip,port      |        vmbus socket        |                          |                         |
+        |                           |                           +---------------------------->                          |                         |
+        |                           |                           |       vmbus package        |                          |                         |
+        |                           |                           |                            +----+                     |                         |
+        |                           |                           |                            |    | dispatch message    |                         |
+        |                           |                           |                            |    |                     |                         |
+        |                           |                           |                            <----+                     |                         |
+        |                           |                           |                            |                          |                         |
+        |                           |                           |                            |        callback          |                         |
+        |                           |                           |                            +-------------------------->                         |
+        |                           |                           |                            |    proxy-open message    |                         |
+        |                           |                           |                            |                          +----+                    |
+        |                           |                           |                            |                          |    | get vmid,proxyid   |
+        |                           |                           |                            |                          |    | and ip,port        |
+        |                           |                           |                            |                          <----+                    |
+        |                           |                           |                            |                          |                         |
+        |                           |                           |                            |                          |      tcp connect        |
+        |                           |                           |                            |                          +------------------------->
+        |                           |                           |                            |                          |                         |
+        |                           |                           |                            |                          |      connect ack        |
+        |                           |                           |                            |                          <-------------------------+
+        |                           |                           |                            |                          |                         |
+        |                           |                           |                            |                          +----+ get sock to b.com  |
+        |                           |                           |                            |                          |    | map vmid,proxyid   |
+        |                           |                           |                            |                          |    | with sock          |
+        |                           |                           |                            |                          <----+                    |
+        |                           |                           |                            |                          |                         |
+        |                           |                           |                            |          call            |                         |
+        |                           |                           |                            <--------------------------+                         |
+        |                           |                           |                            |  proxy-open-ack message  |                         |
+        |                           |                           |       vmbus socket         |                          |                         |
+        |                           |                           <----------------------------+                          |                         |
+        |                           |                           |      vmbus package         |                          |                         |
+        |                           |                           |                            |                          |                         |
+        |                           |                           +----+                       |                          |                         |
+        |                           |                           |    | dispatch message      |                          |                         |
+        |                           |                           |    |                       |                          |                         |
+        |                           |                           <----+                       |                          |                         |
+        |                           |                           |                            |                          |                         |
+        |                           |        callback           |                            |                          |                         |
+        |                           <---------------------------+                            |                          |                         |
+        |                           |  proxy-open-ack message   |                            |                          |                         |
+        |     socksv5 handshake     |                           |                            |                          |                         |
+        <---------------------------+                           |                            |                          |                         |
+        |          ack              |                           |                            |                          |                         |
+        +                           +                           +                            +                          +                         +
+
+
+```
+
 #### 4.3.1 proxy-client
 
+the proxy-client deploys on both the virtual machine and physical machine endpoint, listening on 127.0.0.1:6542, providing socksv5 protocol for user processes. after accepting a connection, the socket-with-user generated, the proxy client generates a unique proxy-id binding to the socket-with-user, so, for the proxy client on the virtual machine endpoint, it holds a set of two-tuple, that is:
+
+		{<socket-with-user, proxy-id>}
+
+for data received from socket-with-user, proxy client will send it to vmbus-tunnel with the proxy-id, for data received from vmbus-tunnel, proxy client will unpack it and get the proxy-id, then get the socket-with-user by proxy-id and send data to user by the socket-with-user.
+
+for proxy client on the physical machine endpoint, there's a little differences. after socket-with-user generated, proxy client will get the target ip by socks protocol, then, proxy client should call the get_vmid_by_ip interface provided by vmbus-tunnel which mentioned in above section, to get the target virtual machine vmid. so, for the proxy client on the physical machine endpoint, it holds a set of triple-tuple, that is:
+
+		{<socket-with-user, proxy-id, vmid>}
+
+for data recevied from socket-with-user, proxy client will send it to vmbus tunnel with the proxy-id to the target virtual machine distinguished by vmid, for data received from vmbus tunnel, same with proxy client on virtual machine endpoint, it only needs the proxy-id to get the socket-with-user and then send data to user.
+
+
 #### 4.3.2 proxy-server
+
+the proxy server deploys on both the virtual machine and physical machine endpoint, after received the PROXY-OPEN message, it will get the proxy-id, target ip and port and the vmid where this message come from, then it will try to connect to the target, and then response to proxy client by PROXY-OPEN-ACK message to inform if the connection being established or not.
+
+for the proxy-server on virtual machine endpoint, it holds a set of two-tuple, that is:
+
+		{<socket-with-target, proxy-id>}
+		
+for the proxy server on physical machine endpoint, it holds a set of triple-tuple, that is:
+
+		{<socket-with-target, proxy-id, vmid>}
 
 ### 4.4 virutal-subnet approach
 
