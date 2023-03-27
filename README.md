@@ -432,6 +432,10 @@ for the proxy server on physical machine endpoint, it holds a set of triple-tupl
 
 the main purpose is to make the physical machine and virtual machines combined as a virtual subnet with the physical machine as the default gateway for each virtual machine and the router of this virtual subnet.
 
+Windows ebpf: https://github.com/microsoft/ebpf-for-windows
+
+Windows tun: https://github.com/WireGuard/wintun
+
 #### 4.4.1 ip-bearer
 
 this application entity is used for transmitting IP packages by using vmbus tunnel, for data production, it opens the vir-ethio device and holds its file descriptor, then read IP packages from vir-ethio device and send to remote endpoint, for data consumption, it receives IP packages from vmbus tunnel, then writes to vir-ethio device. 
