@@ -41,54 +41,52 @@ networking for the virtual machines and physical machine, a virtual subnet can b
 in summary, below is the architecture overview illustration
 
 ```
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
                                                                                                    +------------+
                                                                                                    |            |
-                                                                                                   | httpserver <-----------------------------------------+
-                                                                                                   |            |                                         |
-                                                                                                   +-----^------+                                         |
-                                                                                                         |                                                |
-                                                                                                         |                                                |
+                                                                                                   | httpserver <------------------------------------------------------+
+                                                                                                   |            |                                                      |
+                                                                                                   +-----^------+                                                      |
+                                                                                                         |                                                             |
+                                                                                                         |                                                             |
 +--------------------------------------------------------------------------+        +-------------------------------------------------------------------------------------------+
-|                                                                          |        |                    |                                                |                     |
-|                                                                          |        |                    |                                                |                     |
-|      +----------+           +---------+      +----------+  +--------+    |        |   +------------+   |   +--------------------+  +-------------+      |                     |
-|      | curl ... |           | ping... |      | wget ... |  |  sshd  |    |        |   | ssh client |   |   | vmbusifyexec ping..|  | vmbusifyctl |      |                     |
-|      +----+-----+           +----^----+      +-----+----+  +---^----+    |        |   +-------+----+   |   +---+----------------+  +--+----------+      |                     |
-|           |                      |                 |           |         |        |           |        |       |                      |                 |                     |
-|           |                      +-------+         |           |         |        |           |        |       |   +------------------+                 |                     |
-|           |                              |         |           |         |        |           |        |       |   |                                    |                     |
-|           |                +--------+----+-----+---v----+------+-+       |        |       +---v----+---+----+--v---v---+--------+                       |                     |
-|           |                |        |          |        |        |       |        |       |        |        |          |        |                       |                     |
-|           |                | ip     | command  | proxy  | proxy  |       |        |       | proxy  | proxy  | command  | ip     |                       |                     |
-|           |          +-----> bearer | executor | client | server |       |        |       | client | server | listener | bearer <----+                  |                     |
-|           |          |     |        |          |        |        |       |        |       |        |        |          |        |    |                  |                     |
-|           |          |     +--------+----------+--------+--------+       |        |       +--------+--------+----------+--------+    |                  |                     |
-|           |          |     |                                     |       |        |       |                                     |    |                  |                     |
-|           |          |     |           vmbus tunnel              |       |        |       |            vmbus tunnel             |    |                  |                     |
-|           |          |     |                                     |       |        |       |                                     |    |                  |                     |
-|           |          |     +-----------------^-------------------+       |        |       +------------------^------------------+    |                  |                     |
-|           |          |                       |                           |        |                          |                       |                  |                     |
-|           |          |                       |                           |        |                          |                       |                  |                     |
-|     +-----v------+   |               +-------v--------+                  |        |                  +-------+--------+              |             +----+-----+               |
-|     |            |   |               |                |                  |        |                  |                |              |             |          |               |
-|     | tcp-socket |   |               |  vmbus-socket  |                  |        |                  |  vmbus-socket  |              |             |    NAT   |               |
-|     |            |   |               |                |                  |        |                  |                |              |             |          |               |
-|     +-----+------+   |               +-------^--------+                  |        |                  +-------^--------+              |             +----^-----+               |
-|           |          |                       |                           |        |                          |                       |                  |                     |
-|           |          |                       |                           |        |                          |                       |                  |                     |
+|                                                                          |        |                    |                                                             |        |
+|                                                                          |        |                    |                                                             |        |
+|      +----------+           +---------+      +----------+  +--------+    |        |   +------------+   |   +--------------------+  +-------------+                   |        |
+|      | curl ... |           | ping... |      | wget ... |  |  sshd  |    |        |   | ssh client |   |   | vmbusifyexec ping..|  | vmbusifyctl |                   |        |
+|      +----+-----+           +----^----+      +-----+----+  +---^----+    |        |   +-------+----+   |   +---+----------------+  +--+----------+                   |        |
+|           |                      |                 |           |         |        |           |        |       |                      |                              |        |
+|           |                      +-------+         |           |         |        |           |        |       |   +------------------+                              |        |
+|           |                              |         |           |         |        |           |        |       |   |                                                 |        |
+|           |                +--------+----+-----+---v----+------+-+       |        |       +---v----+---+----+--v---v---+--------+                                    |        |
+|           |                |        |          |        |        |       |        |       |        |        |          |        |                                    |        |
+|           |                | ip     | command  | proxy  | proxy  |       |        |       | proxy  | proxy  | command  | ip     |                                    |        |
+|           |          +-----> bearer | executor | client | server |       |        |       | client | server | listener | bearer <----+                               |        |
+|           |          |     |        |          |        |        |       |        |       |        |        |          |        |    |                               |        |
+|           |          |     +--------+----------+--------+--------+       |        |       +--------+--------+----------+--------+    |                               |        |
+|           |          |     |                                     |       |        |       |                                     |    |                               |        |
+|           |          |     |           vmbus tunnel              |       |        |       |            vmbus tunnel             |    |                               |        |
+|           |          |     |                                     |       |        |       |                                     |    |                               |        |
+|           |          |     +-----------------^-------------------+       |        |       +------------------^------------------+    |                               |        |
+|           |          |                       |                           |        |                          |                       |                               |        |
+|           |          |                       |                           |        |                          |                       |                               |        |
+|     +-----v------+   |               +-------v--------+                  |        |                  +-------+--------+              |                               |        |
+|     |            |   |               |                |                  |        |                  |                |              |                               |        |
+|     | tcp-socket |   |               |  vmbus-socket  |                  |        |                  |  vmbus-socket  |              |                               |        |
+|     |            |   |               |                |                  |        |                  |                |              |                               |        |
+|     +-----+------+   |               +-------^--------+                  |        |                  +-------^--------+              |                               |        |
+|           |          |                       |                           |        |                          |                       |                               |        |
+|           |          |                       |                           |        |                          |                       |                               |        |
 +--------------------------------------------------------------------------+        +-------------------------------------------------------------------------------------------+
-|           |          |                       |                           |        |                          |                       |                  |                     |
-|           |          |                       |                           |        |                          |                       |                  |                     |
-|      +----v----+  +--+-----------+   +-------v--------+                  |        |                  +-------v--------+          +---v---------+   +----v----+                |
-|      |   tcp   |  |              |   |                |                  |        |                  |                |          |             |   |   tcp   |                |
-|      +---------+  |   vir-ethio  |   |  vmbus-device  <---------------------------------------------->  vmbus-device  |          |  vir-ethio  |   +---------+                |
-|      |   ip    |  |              |   |                |                  |        |                  |                |          |             |   |   ip    |                |
-|      +------^--+  +--^-----------+   +----------------+                  |        |                  +----------------+          +----------^--+   +---^-----+                |
-|             |        |                                                   |        |                                                         |          |                      |
-|             |        |                                                   |        |                                                         |          |                      |
-|             +--------+                                                   |        |                                                         +----------+                      |
+|           |          |                       |                           |        |                          |                       |                               |        |
+|           |          |                       |                           |        |                          |                       |                               |        |
+|      +----v----+  +--+-----------+   +-------v--------+                  |        |                  +-------v--------+          +---v---------+  +----------+  +----+----+   |
+|      |   tcp   |  |              |   |                |                  |        |                  |                |          |             |  |    tcp   |  |         |   |
+|      +---------+  |   vir-ethio  |   |  vmbus-device  <---------------------------------------------->  vmbus-device  |          |  vir-ethio  |  +----------+  |   nat   |   |
+|      |   ip    |  |              |   |                |                  |        |                  |                |          |             |  |    ip    |  |         |   |
+|      +------^--+  +--^-----------+   +----------------+                  |        |                  +----------------+          +----------^--+  +--^----^--+  +---^-----+   |
+|             |        |                                                   |        |                                                         |        |    |         |         |
+|             |        |                                                   |        |                                                         |        |    |         |         |
+|             +--------+                                                   |        |                                                         +--------+    +---------+         |
 |                                                                          |        |                                                                                           |
 |                                                        virtual machine   |        |  physical machine                                                                         |
 |                                                                          |        |                                                                                           |
@@ -108,7 +106,7 @@ virtual machine connection relationship triple-tuple:
 
 		{<vmid, ip, socket>}
 
-on physical machine endpoint, VMID is provide for upper layer to distinguish the target virutal machine to vmbus-tunnel that it would like to send message to, and vmbus-tunnel provide a service for upper layer to get VMID by virtual machine IP address. as the following illustration, physical machine manages multiple connections and only one connection for each virtual machine, for the vmbus-tunnel, we only support sending and receiving messages between the virtual machine and physical machine, dispatching message from one virtual machine to another virtual machine via physical machine by vmbus-tunnel is not support.
+on physical machine endpoint, VMID is provide for upper layer to distinguish the target virutal machine to vmbus tunnel that it would like to send message to, and vmbus tunnel provide a service for upper layer to get VMID by virtual machine IP address. as the following illustration, physical machine manages multiple connections and only one connection for each virtual machine, for the vmbus tunnel, we only support sending and receiving messages between the virtual machine and physical machine, dispatching message from one virtual machine to another virtual machine via physical machine by vmbus tunnel is not support.
 
 
 ```
@@ -141,7 +139,7 @@ on physical machine endpoint, VMID is provide for upper layer to distinguish the
 
 ```
 
-multiplexing on each connection between virtual machine and physical machine requires the tunnel as a serialized transmission channel for all TLV format vmbus packages, this makes the data transmission mechanism simple and easy to understand, meanwhile, we provide both synchronized and asynchronized mode for sending data. for the upper layer of vmbus-tunnel illustrated in the graph, such as proxy client/server, command listener/executor and so on, we define them as the application layer, for each entity in the application layer, we define the application layer transfer unit which means the payload of vmbus package as application message. as the illustration below, the hierarchy architecture contains two layers, the infrastructure is vmbus-tunnel for transmitting vmbus-package and the upper layer is application layer for transmitting application-message.
+multiplexing on each connection between virtual machine and physical machine requires the tunnel as a serialized transmission channel for all TLV format vmbus packages, this makes the data transmission mechanism simple and easy to understand, meanwhile, we provide both synchronized and asynchronized mode for sending data. for the upper layer of vmbus tunnel illustrated in the graph, such as proxy client/server, command listener/executor and so on, we define them as the application layer, for each entity in the application layer, we define the application layer transfer unit which means the payload of vmbus package as application message. as the illustration below, the hierarchy architecture contains two layers, the infrastructure is vmbus tunnel for transmitting vmbus-package and the upper layer is application layer for transmitting application-message.
 
 ```
 
@@ -175,7 +173,7 @@ below is the illustration that indicating the elements of vmbus package, the 'si
 
 ```
 
-vmbus-tunnel provide a registry service for them to declare themselves by using their entity names and then, declare all message id they wish to receive and message handler for processing it. the primary key for message is <entity-name, message-id>, for both endpoint, the vmbus-tunnel keeps a set of two-tuple, we call it application message route table.
+vmbus tunnel provide a registry service for them to declare themselves by using their entity names and then, declare all message id they wish to receive and message handler for processing it. the primary key for message is <entity-name, message-id>, for both endpoint, the vmbus tunnel keeps a set of two-tuple, we call it application message route table.
 
 application message route table two-tuple, the second element of the tuple is a set of triple-tuple that indicating all messages that the entity wish to receive and their message handlers.
 
@@ -192,7 +190,7 @@ for sending and receiving data, on virtual machine endpoint, vmbus tunnel provid
 	typedef int (*message_handler)(int message_id, char const * data, int size, char ** out_buf_ptr, int * bytes_returned);
 ```
 
-for sending and receiving data, on physical machine endpoint, vmbus-tunnel provide the following interfaces:
+for sending and receiving data, on physical machine endpoint, vmbus tunnel provide the following interfaces:
 
 ```
 	int sync_send(string const &vmid, int message_id, char const * data, int size, char ** out_buf_ptr, int * bytes_returned);
@@ -205,7 +203,7 @@ the intefaces quoted above are only a conceptual design, the sync_send and async
 
 ### 4.2 command-execution approach
 
-to sum up the command execution mechanism, the vmbusifyexec, command listener, vmbus-tunnel and command executor get together to constitute an application for remote commands execution, such as the Windows internal tool 'PsExec'.
+to sum up the command execution mechanism, the vmbusifyexec, command listener, vmbus tunnel and command executor get together to constitute an application for remote commands execution, such as the Windows internal tool 'PsExec'.
 
 ```
                             physical machine                                                                   virtual machine
@@ -275,11 +273,11 @@ this entity is a command line tool for executing command on virtual machines via
 
 #### 4.2.2 command-listener
 
-this entity only deploys on physical machine endpoint, listen on tcp 127.0.0.1:6543, providing an operation interface for command line tools such as vmbusifyctl and vmbusifyexec. we defined two types of commands, the first class is built-in commands for controlling the vmbus-tunnel, for example, connect to or disconnect from given target virtual machine, the second class is application specified commands, for example, execute ping command on given target virtual machine. actually, the command listener works based on a http server, command tools use http protocol to communicate with it.
+this entity only deploys on physical machine endpoint, listen on tcp 127.0.0.1:6543, providing an operation interface for command line tools such as vmbusifyctl and vmbusifyexec. we defined two types of commands, the first class is built-in commands for controlling the vmbus tunnel, for example, connect to or disconnect from given target virtual machine, the second class is application specified commands, for example, execute ping command on given target virtual machine. actually, the command listener works based on a http server, command tools use http protocol to communicate with it.
 
 #### 4.2.3 command-executor
 
-this entity only deploys on virtual machine endpoint, it receives command execution messages from vmbus-tunnel initiated by vmbusifyexec tool via command listener, then it will create process to run required program, redirect stdin and stdout if required, print on stdout could be returned to vmbusifyexec on time. set timeout for executing process is supported and after process terminated, exit code will be returned to vmbusifyexec.
+this entity only deploys on virtual machine endpoint, it receives command execution messages from vmbus tunnel initiated by vmbusifyexec tool via command listener, then it will create process to run required program, redirect stdin and stdout if required, print on stdout could be returned to vmbusifyexec on time. set timeout for executing process is supported and after process terminated, exit code will be returned to vmbusifyexec.
 
 ### 4.3 socks-proxy approach
 
@@ -384,13 +382,15 @@ the proxy-client deploys on both the virtual machine and physical machine endpoi
 
 		{<socket-with-user, proxy-id>}
 
-for data received from socket-with-user, proxy client will send it to vmbus-tunnel with the proxy-id, for data received from vmbus-tunnel, proxy client will unpack it and get the proxy-id, then get the socket-with-user by proxy-id and send data to user by the socket-with-user.
+for data received from socket-with-user, proxy client will send it to vmbus tunnel with the proxy-id, for data received from vmbus tunnel, proxy client will unpack it and get the proxy-id, then get the socket-with-user by proxy-id and send data to user by the socket-with-user.
 
-for proxy client on the physical machine endpoint, there's a little differences. after socket-with-user generated, proxy client will get the target ip by socks protocol, then, proxy client should call the get_vmid_by_ip interface provided by vmbus-tunnel which mentioned in above section, to get the target virtual machine vmid. so, for the proxy client on the physical machine endpoint, it holds a set of triple-tuple, that is:
+for proxy client on the physical machine endpoint, there's a little difference. after socket-with-user generated, proxy client will get the target ip by socks protocol, then, proxy client should call the get_vmid_by_ip interface provided by vmbus tunnel which mentioned in above section, to get the target virtual machine vmid. so, for the proxy client on the physical machine endpoint, it holds a set of triple-tuple, that is:
 
 		{<socket-with-user, proxy-id, vmid>}
 
-for data recevied from socket-with-user, proxy client will send it to vmbus tunnel with the proxy-id to the target virtual machine distinguished by vmid, for data received from vmbus tunnel, same with proxy client on virtual machine endpoint, it only needs the proxy-id to get the socket-with-user and then send data to user.
+for data received from socket-with-user, proxy client will send it to vmbus tunnel with the proxy-id to the target virtual machine distinguished by vmid, for data received from vmbus tunnel, same with proxy client on virtual machine endpoint, it only needs the proxy-id to get the socket-with-user and then send data to user.
+
+in addition, we also provide a socks hook dynamic link library which can replace the original call of socket interfaces of a program and redirect the connection to socks proxy client, that making the socks proxy totally transparent for the program and user. on Windows we use detour mechanism and on Linux we use RTLD_NEXT trick to achieve this goal. user could use this library for those programs that do not support socksv5 protocol. another advantage is that by hooking socket interfaces via this library, user's process do not care whether the network is available or not, when the network is down and the vmbus tunnel is ready, this library would redirect tcp connections to be carried by socks protocol by using vmbus tunnel, otherwise, this library would directly dispatch user's call to original socket interface. this makes the communication can automatically and transparently switch from tcp/ip network to vmbus tunnel.
 
 
 #### 4.3.2 proxy-server
@@ -407,8 +407,23 @@ for the proxy server on physical machine endpoint, it holds a set of triple-tupl
 
 ### 4.4 virutal-subnet approach
 
+the main purpose is to make the physical machine and virtual machines combined as a virtual subnet with the physical machine as the default gateway for each virtual machine and the router of this virtual subnet.
+
 #### 4.4.1 ip-bearer
+
+this application entity is used for transmitting IP packages by using vmbus tunnel, for data production, it opens the vir-ethio device and holds its file descriptor, then read IP packages from vir-ethio device and send to remote endpoint, for data consumption, it receives IP packages from vmbus tunnel, then writes to vir-ethio device. 
+
+for the proxy server endpoint, besides the responsibility for IP packages dispatching, it has further more tasks, that is, management and assignment virtual subnet IP addresses for all virtual machines. on the initialization stage after vmbus tunnel established with a given virtual machine, ip-bearer application on physical machine endpoint will send a IP assignment message to the virtual machine, the virtual machine then will enable the vir-ethio and set the given IP address to it, then update the ip table to make all required IP packages route to the vir-ethio device.
+
+for physical endpoint, it holds a set of two-tuple, that is:
+
+		{<virtual-subnet-ip, vmid>}
 
 #### 4.4.2 vir-ethio
 
+typically, this is a tun device, with the IP address assigned by ip-bearer that given by physical meachine endpoint, created and managed by ip-bearer entity.
+
 #### 4.4.3 nat
+
+typically, this is also a tun device. by using a free software with proper configurations, we can make the bidirectional access available, not only from virtual machine to external network but also from external network to virtual machine. 
+
