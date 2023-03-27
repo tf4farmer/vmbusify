@@ -41,6 +41,9 @@ networking for the virtual machines and physical machine, a virtual subnet can b
 in summary, below is the architecture overview illustration
 
 ```
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
                                                                                                    +------------+
                                                                                                    |            |
                                                                                                    | httpserver <------------------------------------------------------+
@@ -391,6 +394,26 @@ for proxy client on the physical machine endpoint, there's a little difference. 
 for data received from socket-with-user, proxy client will send it to vmbus tunnel with the proxy-id to the target virtual machine distinguished by vmid, for data received from vmbus tunnel, same with proxy client on virtual machine endpoint, it only needs the proxy-id to get the socket-with-user and then send data to user.
 
 in addition, we also provide a socks hook dynamic link library which can replace the original call of socket interfaces of a program and redirect the connection to socks proxy client, that making the socks proxy totally transparent for the program and user. on Windows we use detour mechanism and on Linux we use RTLD_NEXT trick to achieve this goal. user could use this library for those programs that do not support socksv5 protocol. another advantage is that by hooking socket interfaces via this library, user's process do not care whether the network is available or not, when the network is down and the vmbus tunnel is ready, this library would redirect tcp connections to be carried by socks protocol by using vmbus tunnel, otherwise, this library would directly dispatch user's call to original socket interface. this makes the communication can automatically and transparently switch from tcp/ip network to vmbus tunnel.
+
+```
+                    PRELOAD and RTLD_NEXT
+                              +
++-----------------+           |           +-----------------+
+|                 |           |           |                 |
+|   wget b.com    |           |           |   wget b.com    |
+|                 |           |           |                 |
++--------+--------+           |           +--------+--------+
+         |                    |                    |
+         |                +---v--->                |
+         |                                         |
++--------v--------+       +------->       +--------v--------+             +-----------------+
+|                 |                       |                 |             |                 |
+|     libc.so     |                       |     proxy.so    +------------->   proxy client  |
+| int connect(..) |                       | int connect(..) |             | listen on 6542  |
+|                 |                       |                 |             |                 |
++-----------------+                       +-----------------+             +-----------------+
+
+```
 
 
 #### 4.3.2 proxy-server
